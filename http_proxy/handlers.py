@@ -44,7 +44,7 @@ class BaseCocaineProxy(tornado.web.RequestHandler):
         chunks_g = service.enqueue(cocaine_method, msgpack.dumps(data))
 
         for chunk in chunks_g:
-            yield umsgpack.loads(chunk)
+            yield chunk
 
         service.disconnect()
         self.log("process_asynchronous() finished")
