@@ -17,6 +17,7 @@ request_cnt = 0
 class CocaineProxySync(RequestHandler):
     def process_synchronous(self, cocaine_service_name):
         """Synchronous Cocaine worker handling."""
+        self.log("In process_synchronous()")
         service = Service(cocaine_service_name)
         response = service.enqueue(
             "sleepy_echo",
@@ -25,11 +26,13 @@ class CocaineProxySync(RequestHandler):
         self.write(response)
         service.disconnect()
         self.finish()
+        self.log("process_synchronous() finished")
 
     def log(self, data):
         logging.info("{0} - {1}".format(self.request_num, data))
 
     def get(self):
+        global request_cnt
         request_cnt += 1
         self.request_num = request_cnt
         self.log("In get()")
