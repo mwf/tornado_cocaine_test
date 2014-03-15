@@ -21,11 +21,12 @@ from http_proxy.handlers import CocaineProxySync
 if __name__ == '__main__':
     try:
         define("debug", default=False, help="run Tornado in debug mode")
+        define("host", default="0.0.0.0", help="host to listen on")
+        define("port", default=8888, help="port to listen on")
         parse_command_line()
 
-        port = 8899
-
-        logging.info("Tornado server started, port {0}".format(port))
+        logging.info("Tornado server started on '{0}:{1}'".format(
+            options["host"], options["port"]))
         logging.info("debug = {0}".format(options["debug"]))
         logging.info("logging_level = {0}".format(
             options["logging"]))
@@ -35,7 +36,7 @@ if __name__ == '__main__':
         )
 
         http_server = HTTPServer(application)
-        http_server.listen(port, 'localhost')
+        http_server.listen(options["port"], options["host"])
 
         loop = IOLoop.instance()
 
