@@ -44,6 +44,7 @@ class BaseCocaineProxy(tornado.web.RequestHandler):
         chunks_g = service.enqueue(cocaine_method, msgpack.dumps(data))
 
         for chunk in chunks_g:
+            self.log("yielding {0}".format(chunk))
             yield chunk
 
         service.disconnect()
@@ -74,6 +75,7 @@ class PowersWithLogin(BaseCocaineProxy):
         if "error" in login_response:
             self.log("Login '{0}' is invalid!".format(login))
             self.write(login_response)
+            self.finish()
         else:
             self.log("Login '{0}' ok!".format(login))
 
@@ -82,3 +84,5 @@ class PowersWithLogin(BaseCocaineProxy):
 
             for chunk in powers_gen:
                 self.write("{0} ".format(chunk))
+
+        self.log("Finished get()")
