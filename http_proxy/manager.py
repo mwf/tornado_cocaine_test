@@ -16,7 +16,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from http_proxy.handlers import SleepSynchronous
+from http_proxy.handlers import SleepSynchronous, PowersWithLogin
 
 if __name__ == '__main__':
     try:
@@ -32,6 +32,7 @@ if __name__ == '__main__':
             options["logging"]))
         application = Application([
             (r'/sleepy_sync/?', SleepSynchronous),
+            (r'/power/?', PowersWithLogin),
             ], debug=options["debug"],
         )
 
