@@ -35,7 +35,6 @@ class BaseCocaineProxy(tornado.web.RequestHandler):
         self.log("process_synchronous() finished")
         return response
 
-    @asynchronous
     def process_asynchronous(self, cocaine_service_name, cocaine_method, data):
         """Run selected service and get all chunks as generator."""
         self.log("In process_asynchronous()")
@@ -58,6 +57,7 @@ class SleepSynchronous(BaseCocaineProxy):
         time = float(self.get_argument("time", 10.0))
         res = self.process_synchronous("sleepy", "sleepy_echo", time)
         self.write(res)
+        self.finish()
 
 
 class PowersWithLogin(BaseCocaineProxy):
@@ -75,7 +75,6 @@ class PowersWithLogin(BaseCocaineProxy):
         if "error" in login_response:
             self.log("Login '{0}' is invalid!".format(login))
             self.write(login_response)
-            self.finish()
         else:
             self.log("Login '{0}' ok!".format(login))
 
@@ -84,5 +83,5 @@ class PowersWithLogin(BaseCocaineProxy):
 
             for chunk in powers_gen:
                 self.write("{0} ".format(chunk))
-
+        self.finish()
         self.log("Finished get()")
