@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-from tornado.web import RequestHandler
+import tornado.web
 
 import msgpack
 import logging
@@ -15,7 +15,7 @@ from cocaine.asio.engine import asynchronous
 request_cnt = 0
 
 
-class BaseCocaineProxy(RequestHandler):
+class BaseCocaineProxy(tornado.web.RequestHandler):
     def prepare(self):
         """Count incoming requests for better debug"""
         global request_cnt
@@ -53,7 +53,32 @@ class BaseCocaineProxy(RequestHandler):
 class SleepSynchronous(BaseCocaineProxy):
     def get(self):
         """Sleep for requested number of seconds"""
-        time = float(self.get_argument("time", 10.0))
         self.log("In get()")
+        time = float(self.get_argument("time", 10.0))
         res = self.process_synchronous("sleepy", "sleepy_echo", time)
         self.write(res)
+
+
+class PowersWithLogin(BaseCocaineProxy):
+    @tornado.web.asynchronous
+    def get(self):
+        """Test 2 workers consequent work"""
+        self.log("In get()")
+        login = self.get_argument("login")
+        power = int(self.get_argument("power", 10))
+        self.log("Login: '{0}', power: '{1}'".format(login, power))
+
+        login_response_gen = self.process_asynchronous(
+            "login", "login", login)
+        login_response = session_res.next()
+        if "error" in login_response:
+            self.log("Login '{0}' is invalid!".format(login))
+            self.write(login_response)
+        else:
+            self.log("Login '{0}' ok!".format(login))
+
+            login_response_gen = self.process_asynchronous(
+                "powers", "binary_powers", power)
+
+            for chunk in login_response_gen:
+                self.write("{0} ".format(chunk))
