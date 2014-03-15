@@ -16,7 +16,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from http_proxy.handlers import CocaineProxySync
+from http_proxy.handlers import SleepSynchronous
 
 if __name__ == '__main__':
     try:
@@ -31,7 +31,7 @@ if __name__ == '__main__':
         logging.info("logging_level = {0}".format(
             options["logging"]))
         application = Application([
-            (r'/sleepy_sync/?', CocaineProxySync),
+            (r'/sleepy_sync/?', SleepSynchronous),
             ], debug=options["debug"],
         )
 
