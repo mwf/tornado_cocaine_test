@@ -70,15 +70,15 @@ class PowersWithLogin(BaseCocaineProxy):
 
         login_response_gen = self.process_asynchronous(
             "login", "login", login)
-        login_response = session_res.next()
+        login_response = login_response_gen.next()
         if "error" in login_response:
             self.log("Login '{0}' is invalid!".format(login))
             self.write(login_response)
         else:
             self.log("Login '{0}' ok!".format(login))
 
-            login_response_gen = self.process_asynchronous(
+            powers_gen = self.process_asynchronous(
                 "powers", "binary_powers", power)
 
-            for chunk in login_response_gen:
+            for chunk in powers_gen:
                 self.write("{0} ".format(chunk))
