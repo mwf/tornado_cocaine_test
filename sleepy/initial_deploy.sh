@@ -1,0 +1,1 @@
+cocaine-tool profile upload --name TestProfile --profile profile.json
