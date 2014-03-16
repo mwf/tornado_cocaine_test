@@ -11,6 +11,7 @@ import logging
 
 from cocaine.services import Service
 from cocaine.asio.engine import asynchronous
+from cocaine.exceptions import ChokeEvent
 
 request_cnt = 0
 
@@ -42,10 +43,7 @@ class BaseCocaineProxy(tornado.web.RequestHandler):
 
         chunks_g = service.enqueue(cocaine_method, msgpack.dumps(data))
 
-        for chunk in chunks_g:
-            self.log("yielding {0}".format(chunk))
-            yield chunk
-
+        yield chunks_g
         service.disconnect()
         self.log("process_asynchronous() finished")
 
@@ -71,17 +69,48 @@ class PowersWithLogin(BaseCocaineProxy):
 
         login_response_gen = self.process_asynchronous(
             "login", "login", login)
+
+        # It's a blocking operation!
         login_response = login_response_gen.next()
+
         if "error" in login_response:
             self.log("Login '{0}' is invalid!".format(login))
             self.write(login_response)
+            self.finish()
         else:
             self.log("Login '{0}' ok!".format(login))
+            self.process_powers("powers", "binary_powers", power)
 
-            powers_gen = self.process_asynchronous(
-                "powers", "binary_powers", power)
-
-            for chunk in powers_gen:
-                self.write("{0} ".format(chunk))
-        self.finish()
         self.log("Finished get()")
+
+    @asynchronous
+    def process_powers(self, cocaine_service_name, cocaine_method, data):
+        self.log("In process_powers()")
+        service = Service(cocaine_service_name)
+
+        chunk = yield service.enqueue(cocaine_method, msgpack.dumps(data))
+
+        if chunk:
+            try:
+                while True:
+                    ch = yield
+                    self.log(ch)
+                    self.write_chunk("{0} ".format(ch))
+
+            except ChokeEvent as err:
+                pass
+        else:
+            self.write_chunk("no data!")
+
+        service.disconnect()
+        self.log("process_powers() finished")
+        self.finish()
+
+    def write_chunk(self, data):
+        """Implements chunked data write.
+
+        Transfer-Encoding set to "chunked" automatically
+
+        """
+        self.write(data)
+        self.flush()
