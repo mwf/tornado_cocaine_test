@@ -21,8 +21,8 @@ def login(request, response):
     msg = yield request.read()
     username = msgpack.loads(msg)
     log.debug("Username: {0}".format(username))
-    log.debug("Sleeping for 2 seconds...")
-    sleep(2)
+    # log.debug("Sleeping for 2 seconds...")
+    # sleep(2)
     if username in valid_users:
         response.write("ok")
     else:

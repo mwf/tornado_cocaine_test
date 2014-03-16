@@ -19,6 +19,9 @@ def binary_powers(request, response):
     msg = yield request.read()
     max_power = msgpack.loads(msg)
 
+    log.debug("Sleeping for 2 seconds...")
+    sleep(2)
+
     res = 1
     for i in range(0, max_power):
         res *= 2
