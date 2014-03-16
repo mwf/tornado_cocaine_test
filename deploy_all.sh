@@ -1,3 +1,7 @@
-./sleepy/deploy.sh
-./binary_powers/deploy.sh
-./login/deploy.sh
+cd sleepy
+./deploy.sh
+cd ../binary_powers
+./deploy.sh
+cd ../login
+./deploy.sh
+cd ..
