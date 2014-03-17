@@ -75,7 +75,7 @@ class PowersWithLogin(BaseCocaineProxy):
             "login", "login", login)
 
         self.log("In start_async()")
-        service = Service(cocaine_service_name)
+        service = Service("login")
 
         login_response = yield service.enqueue("login", msgpack.dumps(login))
 
