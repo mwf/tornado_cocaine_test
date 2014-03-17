@@ -71,9 +71,6 @@ class PowersWithLogin(BaseCocaineProxy):
 
     @asynchronous
     def start_async(self, login, power):
-        login_response_gen = self.process_asynchronous(
-            "login", "login", login)
-
         self.log("In start_async()")
         service = Service("login")
 
