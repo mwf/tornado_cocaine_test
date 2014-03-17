@@ -1,4 +1,10 @@
 {
-
+    "concurrency": 1,
+    "isolate": {
+        "args": {
+            "spool": "/usr/local/var/spool/cocaine"
+        },
+        "type": "process"
+    }
 }
 
