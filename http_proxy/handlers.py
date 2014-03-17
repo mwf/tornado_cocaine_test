@@ -67,11 +67,20 @@ class PowersWithLogin(BaseCocaineProxy):
         power = int(self.get_argument("power", 10))
         self.log("Login: '{0}', power: '{1}'".format(login, power))
 
+        self.start_async(login, power)
+
+    @asynchronous
+    def start_async(self, login, power):
         login_response_gen = self.process_asynchronous(
             "login", "login", login)
 
-        # It's a blocking operation!
-        login_response = login_response_gen.next()
+        self.log("In start_async()")
+        service = Service(cocaine_service_name)
+
+        login_response = yield service.enqueue("login", msgpack.dumps(login))
+
+        service.disconnect()
+        self.log("got login!")
 
         if "error" in login_response:
             self.log("Login '{0}' is invalid!".format(login))
