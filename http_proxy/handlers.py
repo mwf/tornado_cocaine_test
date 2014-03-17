@@ -74,6 +74,13 @@ class PowersWithLogin(BaseCocaineProxy):
         self.log("In start_async()")
         service = Service("login")
 
+        try:
+            1/0
+        except Exception as err:
+            self.log("Oups! Error: {0}".format(err))
+            self.finish()
+            raise
+
         login_response = yield service.enqueue("login", msgpack.dumps(login))
 
         service.disconnect()
