@@ -132,20 +132,27 @@ class DoublePowers(BaseCocaineProxy):
         # yield self.powers_4()
         # yield self.powers_8()
 
-        # What should I do now??
+        # Now we need asynchronous trigger-method
+        self.start_async()
 
     @asynchronous
     def start_async(self):
+        """Asynchronous trigger-method to run Cocaine services."""
         self.log("In start_async()")
 
-        self.powers_4().then(self.powers_8)
+        yield self.powers_4()
+        yield self.powers_8()
 
         self.log("Foo")
 
-        self.write_chunk(self.powers_4_res)
-        self.write_chunk("\n")
-        self.write_chunk(self.powers_8_res)
-        self.finish()
+        try:
+            self.write_chunk(str(self.powers_4_res))
+            self.write_chunk("\n")
+            self.write_chunk(str(self.powers_8_res))
+            self.finish()
+        except Exception as err:
+            self.log(err)
+            raise
 
     @asynchronous
     def powers_4(self):
@@ -158,7 +165,7 @@ class DoublePowers(BaseCocaineProxy):
         try:
             while True:
                 ch = yield
-                chunk.append(ch)
+                chunks.append(ch)
 
         except ChokeEvent as err:
             pass
@@ -178,7 +185,7 @@ class DoublePowers(BaseCocaineProxy):
         try:
             while True:
                 ch = yield
-                chunk.append(ch)
+                chunks.append(ch)
 
         except ChokeEvent as err:
             pass
