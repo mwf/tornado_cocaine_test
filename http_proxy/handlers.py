@@ -47,6 +47,15 @@ class BaseCocaineProxy(tornado.web.RequestHandler):
         service.disconnect()
         self.log("process_asynchronous() finished")
 
+    def write_chunk(self, data):
+        """Implements chunked data write.
+
+        Transfer-Encoding set to "chunked" automatically
+
+        """
+        self.write(data)
+        self.flush()
+
 
 class SleepSynchronous(BaseCocaineProxy):
     def get(self):
@@ -111,12 +120,3 @@ class PowersWithLogin(BaseCocaineProxy):
         service.disconnect()
         self.log("process_powers() finished")
         self.finish()
-
-    def write_chunk(self, data):
-        """Implements chunked data write.
-
-        Transfer-Encoding set to "chunked" automatically
-
-        """
-        self.write(data)
-        self.flush()
