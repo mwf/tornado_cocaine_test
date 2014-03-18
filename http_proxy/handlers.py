@@ -96,7 +96,7 @@ class PowersWithLogin(BaseCocaineProxy):
             self.log("Login '{0}' ok!".format(login))
             self.process_powers("powers", "binary_powers", power)
 
-        self.log("Finished get()")
+        self.log("Finished start_async()")
 
     @asynchronous
     def process_powers(self, cocaine_service_name, cocaine_method, data):
@@ -120,3 +120,69 @@ class PowersWithLogin(BaseCocaineProxy):
         service.disconnect()
         self.log("process_powers() finished")
         self.finish()
+
+
+class DoublePowers(BaseCocaineProxy):
+    @tornado.web.asynchronous
+    def get(self):
+        """Test 2 workers consequent work"""
+        self.log("In get()")
+
+        # When cocaine will be based on Futures it'd be easy:
+        # yield self.powers_4()
+        # yield self.powers_8()
+
+        # What should I do now??
+
+    @asynchronous
+    def start_async(self):
+        self.log("In start_async()")
+
+        self.powers_4().then(self.powers_8)
+
+        self.log("Foo")
+
+        self.write_chunk(self.powers_4_res)
+        self.write_chunk("\n")
+        self.write_chunk(self.powers_8_res)
+        self.finish()
+
+    @asynchronous
+    def powers_4(self):
+        self.log("In powers_4()")
+        service = Service("powers")
+
+        chunk = yield service.enqueue("binary_powers", msgpack.dumps(4))
+
+        chunks = [chunk]
+        try:
+            while True:
+                ch = yield
+                chunk.append(ch)
+
+        except ChokeEvent as err:
+            pass
+
+        self.powers_4_res = chunks
+        service.disconnect()
+        self.log("powers_4() finished")
+
+    @asynchronous
+    def powers_8(self):
+        self.log("In powers_8()")
+        service = Service("powers")
+
+        chunk = yield service.enqueue("binary_powers", msgpack.dumps(8))
+
+        chunks = [chunk]
+        try:
+            while True:
+                ch = yield
+                chunk.append(ch)
+
+        except ChokeEvent as err:
+            pass
+
+        self.powers_8_res = chunks
+        service.disconnect()
+        self.log("powers_8() finished")
