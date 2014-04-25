@@ -15,12 +15,29 @@ log = Logger()
 
 
 def sleepy_echo(request, response):
-    """Sleep for requested number of seconds"""
+    """Sleep for requested number of seconds
 
+    Request is a msgpacked dict:
+    {
+        "time": float,   # time in seconds to sleep for
+        "verbose": bool  # if True - send back passed seconds every second
+    }
+
+    """
     msg = yield request.read()
-    t = msgpack.loads(msg)
-    log.debug("Sleeping for {0}...".format(t))
-    sleep(t)
+    params = msgpack.loads(msg)
+
+    t = params["time"]
+    log.debug("Sleeping for {0} seconds".format(t))
+    if params.get("verbose", False):
+        for i in range(1, int(t)+1):
+            sleep(1)
+            response.write(i)
+
+        # sleep for the rest of time, < 1 second
+        sleep(t - int(t))
+    else:
+        sleep(t)
     log.debug("Awaken!")
     response.write("Awaken!")
     response.close()
