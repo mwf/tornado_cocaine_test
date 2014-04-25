@@ -41,8 +41,8 @@ class RunServiceMixin(object):
         Chunks are saved to self.<attr_name>
 
         """
-        service = Service(cocaine_service_name)
         try:
+            service = Service(cocaine_service_name)
             chunk = yield service.enqueue(
                 cocaine_event,
                 serializer.dumps(data))
@@ -64,7 +64,11 @@ class RunServiceMixin(object):
             log.info("Reraising...")
             raise
         finally:
-            service.disconnect()
+            try:
+                service.disconnect()
+            except UnboundLocalError:
+                # service can be unbound if error on initialize
+                pass
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -129,21 +133,28 @@ class CocaineJsonProxy(BaseHandler, RunServiceMixin):
         """A trigger method to start Cocaine workers asynchronously."""
         self.log("In start_async()")
 
-        yield self.run_service(cocaine_service_name="login",
-                               cocaine_event="login",
-                               data=self.json_data["key"],
-                               attr_name="login_result")
-
-        if "error" in self.login_result[0]:
-            self.log("Login '{0}' is invalid!".format(self.json_data["key"]))
-            res = dict(result=self.login_result)
+        try:
+            yield self.run_service(cocaine_service_name="login",
+                                   cocaine_event="login",
+                                   data=self.json_data["key"],
+                                   attr_name="login_result")
+        except Exception as err:
+            res = dict(result=str(err))
             self.write(pretty_json(res))
             self.finish()
         else:
-            self.log("Login '{0}' ok!".format(self.json_data["key"]))
-            yield self.process_stream(cocaine_service_name=service_name,
-                                      cocaine_event=self.json_data["method"],
-                                      data=self.json_data["params"])
+            if "error" in self.login_result[0]:
+                self.log("Login '{0}' is invalid!".format(
+                    self.json_data["key"]))
+                res = dict(result=self.login_result)
+                self.write(pretty_json(res))
+                self.finish()
+            else:
+                self.log("Login '{0}' ok!".format(self.json_data["key"]))
+                yield self.process_stream(
+                    cocaine_service_name=service_name,
+                    cocaine_event=self.json_data["method"],
+                    data=self.json_data["params"])
         self.log("Finished start_async()")
 
     @asynchronous
