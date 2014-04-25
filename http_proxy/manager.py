@@ -20,7 +20,7 @@ from http_proxy.handlers import CocaineJsonProxy
 if __name__ == '__main__':
     try:
         define("debug", default=False, help="run Tornado in debug mode")
-        define("host", default="localhost", help="host to listen on")
+        define("host", default="0.0.0.0", help="host to listen on")
         define("port", default=8888, help="port to listen on")
         parse_command_line()
 
