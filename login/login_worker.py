@@ -25,7 +25,7 @@ def login(request, response):
     if username in valid_users:
         response.write("ok")
     else:
-        response.write("error: user '{0}' not valid!")
+        response.write("error: user '{0}' not valid!".format(username))
     response.close()
 
 
