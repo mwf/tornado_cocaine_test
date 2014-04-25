@@ -15,14 +15,12 @@ import os
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from http_proxy.handlers import (SleepSynchronous, PowersWithLogin,
-    DoublePowers)
+from http_proxy.handlers import CocaineJsonProxy
 
 if __name__ == '__main__':
     try:
         define("debug", default=False, help="run Tornado in debug mode")
-        define("host", default="0.0.0.0", help="host to listen on")
+        define("host", default="localhost", help="host to listen on")
         define("port", default=8888, help="port to listen on")
         parse_command_line()
 
@@ -31,18 +29,15 @@ if __name__ == '__main__':
         logging.info("debug = {0}".format(options["debug"]))
         logging.info("logging_level = {0}".format(
             options["logging"]))
-        application = Application([
-            (r'/sleepy_sync/?', SleepSynchronous),
-            (r'/power/?', PowersWithLogin),
-            (r'/double_power/?', DoublePowers),
-            ], debug=options["debug"],
+        application = Application(
+            [(r'/(\w*)/?', CocaineJsonProxy)],
+            debug=options["debug"],
         )
 
         http_server = HTTPServer(application)
         http_server.listen(options["port"], options["host"])
 
         loop = IOLoop.instance()
-
         logging.info("Starting IOLoop")
         loop.start()
     except KeyboardInterrupt:

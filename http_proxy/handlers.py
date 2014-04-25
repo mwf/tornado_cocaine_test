@@ -21,6 +21,7 @@ request_cnt = 0
 
 
 def pretty_json(stuff):
+    """Get pretty formated json-dumped data."""
     kwargs = dict(ensure_ascii=False, indent=2, encoding="utf8")
     return json.dumps(stuff, **kwargs)
 
@@ -58,7 +59,7 @@ class RunServiceMixin(object):
         except Exception, e:
             log.error('Unexpected error in run_service()\n{0}'.format(
                 formatted_tb()))
-            log.info("Cocaine service: '{0}', method: '{1}', data: {2}".format(
+            log.info("Cocaine service: '{0}', event: '{1}', data: {2}".format(
                 cocaine_service_name, cocaine_event, data))
             log.info("Reraising...")
             raise
@@ -106,24 +107,25 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class CocaineJsonProxy(BaseHandler, RunServiceMixin):
     @tornado.web.asynchronous
-    def post(self):
-        """Authenticate user by login as a key and run sleepy service.
+    def post(self, service_name):
+        """Authenticate user by login as a key and run selected service.
 
         Incoming json should have following structure:
 
         {
-            "key": "login",
-            "params": <sleepy worker params dict>
+            "key": str,  # login
+            "method": str,  # worker's event to enqueue
+            "params": <worker params dict>
         }
 
         """
         self.json_data = self.get_json_data()
         self.log(pretty_json(self.json_data))
 
-        self.start_async()
+        self.start_async(service_name)
 
     @asynchronous
-    def start_async(self):
+    def start_async(self, service_name):
         """A trigger method to start Cocaine workers asynchronously."""
         self.log("In start_async()")
 
@@ -139,8 +141,8 @@ class CocaineJsonProxy(BaseHandler, RunServiceMixin):
             self.finish()
         else:
             self.log("Login '{0}' ok!".format(self.json_data["key"]))
-            yield self.process_stream(cocaine_service_name="sleepy",
-                                      cocaine_event="sleepy_echo",
+            yield self.process_stream(cocaine_service_name=service_name,
+                                      cocaine_event=self.json_data["method"],
                                       data=self.json_data["params"])
         self.log("Finished start_async()")
 
@@ -182,7 +184,7 @@ class CocaineJsonProxy(BaseHandler, RunServiceMixin):
         except Exception as err:
             log.error('Unexpected error in run_service()\n{0}'.format(
                 formatted_tb()))
-            log.info("Cocaine service: '{0}', method: '{1}', data: {2}".format(
+            log.info("Cocaine service: '{0}', event: '{1}', data: {2}".format(
                 cocaine_service_name, cocaine_event, data))
             log.info("Reraising...")
             raise
