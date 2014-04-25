@@ -139,14 +139,14 @@ class CocaineJsonProxy(BaseHandler, RunServiceMixin):
                                    data=self.json_data["key"],
                                    attr_name="login_result")
         except Exception as err:
-            res = dict(result=str(err))
+            res = dict(error=str(err))
             self.write(pretty_json(res))
             self.finish()
         else:
             if "error" in self.login_result[0]:
                 self.log("Login '{0}' is invalid!".format(
                     self.json_data["key"]))
-                res = dict(result=self.login_result)
+                res = dict(error=self.login_result)
                 self.write(pretty_json(res))
                 self.finish()
             else:
@@ -197,7 +197,7 @@ class CocaineJsonProxy(BaseHandler, RunServiceMixin):
                 formatted_tb()))
             log.info("Cocaine service: '{0}', event: '{1}', data: {2}".format(
                 cocaine_service_name, cocaine_event, data))
-            res = dict(result=str(err))
+            res = dict(error=str(err))
             self.write(pretty_json(res))
         finally:
             try:
