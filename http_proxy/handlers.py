@@ -6,6 +6,7 @@ from __future__ import absolute_import
 
 import tornado.web
 
+import simplejson as json
 import msgpack
 import logging
 
@@ -13,39 +14,85 @@ from cocaine.services import Service
 from cocaine.asio.engine import asynchronous
 from cocaine.exceptions import ChokeEvent
 
+from http_proxy.formatted_traceback import formatted_tb
+
+log = logging.getLogger()
 request_cnt = 0
 
 
-class BaseCocaineProxy(tornado.web.RequestHandler):
+def pretty_json(stuff):
+    kwargs = dict(ensure_ascii=False, indent=2, encoding="utf8")
+    return json.dumps(stuff, **kwargs)
+
+
+class RunServiceMixin(object):
+    @asynchronous
+    def run_service(self, cocaine_service_name, cocaine_event, data,
+                    attr_name, serializer=msgpack):
+        """Run selected service and get all chunks.
+
+        Arguments:
+            cocaine_service_name -- service to run,
+            cocaine_event -- Cocaine worker's event name for enqueue,
+            data -- data, serialized for service,
+            serializer -- serializer to use.
+
+        Chunks are saved to self.<attr_name>
+
+        """
+        service = Service(cocaine_service_name)
+        try:
+            chunk = yield service.enqueue(
+                cocaine_event,
+                serializer.dumps(data))
+
+            chunks = [chunk]
+            try:
+                while True:
+                    ch = yield
+                    chunks.append(ch)
+            except ChokeEvent as err:
+                log.debug("Out of chunks!")
+
+            setattr(self, attr_name, chunks)
+        except Exception, e:
+            log.error('Unexpected error in run_service()\n{0}'.format(
+                formatted_tb()))
+            log.info("Cocaine service: '{0}', method: '{1}', data: {2}".format(
+                cocaine_service_name, cocaine_event, data))
+            log.info("Reraising...")
+            raise
+        finally:
+            service.disconnect()
+
+
+class BaseHandler(tornado.web.RequestHandler):
+    @property
+    def mimetype(self):
+        header = self.request.headers.get('Content-Type', '')
+        content_type = header.split(";")
+        return content_type[0]
+
+    def get_json_data(self):
+        """Get dict from json-dumped request body."""
+        if self.mimetype == 'application/json':
+            try:
+                return json.loads(self.request.body)
+            except json.JSONDecodeError as e:
+                log.error("wrong json body format:\n{0}".format(e[0]))
+                raise tornado.web.HTTPError(400)
+        else:
+            log.error("wrong Content-Type header")
+            raise tornado.web.HTTPError(400)
+
     def prepare(self):
-        """Count incoming requests for better debug"""
+        """Count incoming requests for better debug."""
         global request_cnt
         request_cnt += 1
         self.request_num = request_cnt
 
     def log(self, data):
         logging.info("{0} - {1}".format(self.request_num, data))
-
-    def process_synchronous(self, cocaine_service_name, cocaine_method, data):
-        """Synchronous Cocaine worker handling."""
-        self.log("In process_synchronous()")
-        service = Service(cocaine_service_name)
-        response = service.enqueue(cocaine_method, msgpack.dumps(data)).get()
-
-        service.disconnect()
-        self.log("process_synchronous() finished")
-        return response
-
-    def process_asynchronous(self, cocaine_service_name, cocaine_method, data):
-        """Run selected service and get all chunks as generator."""
-        self.log("In process_asynchronous()")
-        service = Service(cocaine_service_name)
-
-        chunks_g = service.enqueue(cocaine_method, msgpack.dumps(data))
-
-        yield chunks_g
-        service.disconnect()
-        self.log("process_asynchronous() finished")
 
     def write_chunk(self, data):
         """Implements chunked data write.
@@ -57,139 +104,90 @@ class BaseCocaineProxy(tornado.web.RequestHandler):
         self.flush()
 
 
-class SleepSynchronous(BaseCocaineProxy):
-    def get(self):
-        """Sleep for requested number of seconds"""
-        self.log("In get()")
-        time = float(self.get_argument("time", 10.0))
-        res = self.process_synchronous("sleepy", "sleepy_echo", time)
-        self.write(res)
-        self.finish()
-
-
-class PowersWithLogin(BaseCocaineProxy):
+class CocaineJsonProxy(BaseHandler, RunServiceMixin):
     @tornado.web.asynchronous
-    def get(self):
-        """Test 2 workers consequent work"""
-        self.log("In get()")
-        login = self.get_argument("login")
-        power = int(self.get_argument("power", 10))
-        self.log("Login: '{0}', power: '{1}'".format(login, power))
+    def post(self):
+        """Authenticate user by login as a key and run sleepy service.
 
-        self.start_async(login, power)
+        Incoming json should have following structure:
 
-    @asynchronous
-    def start_async(self, login, power):
-        self.log("In start_async()")
-        service = Service("login")
+        {
+            "key": "login",
+            "params": <sleepy worker params dict>
+        }
 
-        login_response = yield service.enqueue("login", msgpack.dumps(login))
+        """
+        self.json_data = self.get_json_data()
+        self.log(pretty_json(self.json_data))
 
-        service.disconnect()
-        self.log("got login!")
-
-        if "error" in login_response:
-            self.log("Login '{0}' is invalid!".format(login))
-            self.write(login_response)
-            self.finish()
-        else:
-            self.log("Login '{0}' ok!".format(login))
-            self.process_powers("powers", "binary_powers", power)
-
-        self.log("Finished start_async()")
-
-    @asynchronous
-    def process_powers(self, cocaine_service_name, cocaine_method, data):
-        self.log("In process_powers()")
-        service = Service(cocaine_service_name)
-
-        chunk = yield service.enqueue(cocaine_method, msgpack.dumps(data))
-
-        if chunk:
-            try:
-                while True:
-                    ch = yield
-                    self.log(ch)
-                    self.write_chunk("{0} ".format(ch))
-
-            except ChokeEvent as err:
-                pass
-        else:
-            self.write_chunk("no data!")
-
-        service.disconnect()
-        self.log("process_powers() finished")
-        self.finish()
-
-
-class DoublePowers(BaseCocaineProxy):
-    @tornado.web.asynchronous
-    def get(self):
-        """Test 2 workers consequent work"""
-        self.log("In get()")
-
-        # When cocaine will be based on Futures it'd be easy:
-        # yield self.powers_4()
-        # yield self.powers_8()
-
-        # Now we need asynchronous trigger-method
         self.start_async()
 
     @asynchronous
     def start_async(self):
-        """Asynchronous trigger-method to run Cocaine services."""
+        """A trigger method to start Cocaine workers asynchronously."""
         self.log("In start_async()")
 
-        yield self.powers_4()
-        yield self.powers_8()
+        yield self.run_service(cocaine_service_name="login",
+                               cocaine_event="login",
+                               data=self.json_data["key"],
+                               attr_name="login_result")
 
-        self.log("Foo")
-
-        try:
-            self.write_chunk(str(self.powers_4_res))
-            self.write_chunk("\n")
-            self.write_chunk(str(self.powers_8_res))
+        if "error" in self.login_result[0]:
+            self.log("Login '{0}' is invalid!".format(self.json_data["key"]))
+            res = dict(result=self.login_result)
+            self.write(pretty_json(res))
             self.finish()
+        else:
+            self.log("Login '{0}' ok!".format(self.json_data["key"]))
+            yield self.process_stream(cocaine_service_name="sleepy",
+                                      cocaine_event="sleepy_echo",
+                                      data=self.json_data["params"])
+        self.log("Finished start_async()")
+
+    @asynchronous
+    def process_stream(self, cocaine_service_name, cocaine_event, data,
+                       serializer=msgpack):
+        """Run selected Cocaine service and stream json response.
+
+        Arguments:
+            cocaine_service_name -- service to run,
+            cocaine_event -- Cocaine worker's event name for enqueue,
+            data -- data, serialized for service,
+            serializer -- serializer to use.
+
+        """
+        self.log("In process_stream()")
+        self.set_header("Content-Type", "application/json; charset=UTF-8")
+
+        service = Service(cocaine_service_name)
+
+        self.write_chunked('{"result":[')
+        try:
+            chunk = yield service.enqueue(
+                cocaine_event,
+                serializer.dumps(data))
+
+            self.log("Got first chunk!")
+            self.write_chunked(pretty_json(chunk))
+
+            try:
+                while True:
+                    chunk = yield
+                    wr = pretty_json(chunk)
+                    self.write_chunked("," + wr)
+            except ChokeEvent as err:
+                log.debug("Out of chunks!")
+
+            self.write_chunked("]}")
         except Exception as err:
-            self.log(err)
+            log.error('Unexpected error in run_service()\n{0}'.format(
+                formatted_tb()))
+            log.info("Cocaine service: '{0}', method: '{1}', data: {2}".format(
+                cocaine_service_name, cocaine_event, data))
+            log.info("Reraising...")
             raise
-
-    @asynchronous
-    def powers_4(self):
-        self.log("In powers_4()")
-        service = Service("powers")
-
-        chunk = yield service.enqueue("binary_powers", msgpack.dumps(4))
-
-        chunks = [chunk]
-        try:
-            while True:
-                ch = yield
-                chunks.append(ch)
-
-        except ChokeEvent as err:
-            pass
-
-        self.powers_4_res = chunks
-        service.disconnect()
-        self.log("powers_4() finished")
-
-    @asynchronous
-    def powers_8(self):
-        self.log("In powers_8()")
-        service = Service("powers")
-
-        chunk = yield service.enqueue("binary_powers", msgpack.dumps(8))
-
-        chunks = [chunk]
-        try:
-            while True:
-                ch = yield
-                chunks.append(ch)
-
-        except ChokeEvent as err:
-            pass
-
-        self.powers_8_res = chunks
-        service.disconnect()
-        self.log("powers_8() finished")
+        finally:
+            service.disconnect()
+            self.log("process_powers() finished")
+            self.finish()
+        self.log("process_powers() finished")

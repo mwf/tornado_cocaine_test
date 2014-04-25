@@ -1,2 +1,3 @@
-tornado==3.1.1
+tornado==3.2
 msgpack-python
+simplejson
