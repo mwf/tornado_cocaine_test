@@ -161,35 +161,38 @@ class CocaineJsonProxy(BaseHandler, RunServiceMixin):
         self.log("In process_stream()")
         self.set_header("Content-Type", "application/json; charset=UTF-8")
 
-        service = Service(cocaine_service_name)
-
-        self.write_chunked('{"result":[')
         try:
+            service = Service(cocaine_service_name)
+            self.write_chunk('{"result":[')
+
             chunk = yield service.enqueue(
                 cocaine_event,
                 serializer.dumps(data))
 
             self.log("Got first chunk!")
-            self.write_chunked(pretty_json(chunk))
+            self.write_chunk(pretty_json(chunk))
 
             try:
                 while True:
                     chunk = yield
                     wr = pretty_json(chunk)
-                    self.write_chunked("," + wr)
+                    self.write_chunk("," + wr)
             except ChokeEvent as err:
                 log.debug("Out of chunks!")
 
-            self.write_chunked("]}")
+            self.write_chunk("]}")
         except Exception as err:
             log.error('Unexpected error in run_service()\n{0}'.format(
                 formatted_tb()))
             log.info("Cocaine service: '{0}', event: '{1}', data: {2}".format(
                 cocaine_service_name, cocaine_event, data))
-            log.info("Reraising...")
-            raise
+            res = dict(result=str(err))
+            self.write(pretty_json(res))
         finally:
-            service.disconnect()
-            self.log("process_powers() finished")
+            try:
+                service.disconnect()
+            except UnboundLocalError:
+                # service can be unbound if error on initialize
+                pass
             self.finish()
         self.log("process_powers() finished")
