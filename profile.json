@@ -1,5 +1,7 @@
 {
     "concurrency": 1,
+    "heartbeat-timeout": 300,
+    "grow-threshold": 1,
     "isolate": {
         "args": {
             "spool": "/usr/local/var/spool/cocaine"
