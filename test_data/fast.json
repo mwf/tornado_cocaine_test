@@ -2,7 +2,7 @@
   "key": "vasya",
   "method": "sleepy_echo",
   "params": {
-    "time": 0.1,
+    "time": 0,
     "verbose": true
   }
 }
